@@ -23,25 +23,68 @@ jobs:
       - name: Run TrendRadar
         run: python -m trendradar
 
-      - name: Find latest JSON
+      - name: Export latest data to JSON
         run: |
-          LATEST=$(ls -t output/*.json 2>/dev/null | head -1 || ls -t data/*.json 2>/dev/null | head -1)
-          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+          python3 -c "
+          import sqlite3
+          import json
+          import os
+          from pathlib import Path
+
+          # Find latest database
+          db_dir = Path('output/news')
+          if not db_dir.exists():
+              print('No database found')
+              exit(0)
+
+          dbs = sorted(db_dir.glob('*.db'), reverse=True)
+          if not dbs:
+              print('No database file found')
+              exit(0)
+
+          db_path = dbs[0]
+          print(f'Using database: {db_path}')
+
+          conn = sqlite3.connect(db_path)
+          cursor = conn.cursor()
+
+          # Get latest news data
+          cursor.execute('''
+              SELECT source_id, title, rank, url, mobile_url, first_time, last_time
+              FROM news
+              ORDER BY rank
+              LIMIT 100
+          ''')
+          
+          results = []
+          for row in cursor.fetchall():
+              results.append({
+                  'source_id': row[0],
+                  'title': row[1],
+                  'rank': row[2],
+                  'url': row[3],
+                  'mobile_url': row[4],
+                  'first_time': row[5],
+                  'last_time': row[6]
+              })
+
+          conn.close()
+
+          # Save as JSON
+          output = {'data': results, 'date': str(db_path.stem)}
+          with open('trendradar_latest.json', 'w', encoding='utf-8') as f:
+              json.dump(output, f, ensure_ascii=False, indent=2)
+
+          print(f'Exported {len(results)} items to trendradar_latest.json')
+          "
 
       - name: Upload to Gist
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: ${{ secrets.GIST_ID }}
         run: |
-          LATEST=$(ls -t data/*.json | head -1)
-          CONTENT=$(cat "$LATEST")
-          python3 -c "
-          import json, os, sys
-          content = os.environ['CONTENT']
-          data = {'files': {'trendradar_latest.json': {'content': content}}}
-          print(json.dumps(data))
-          " > /tmp/gist_payload.json
+          CONTENT=$(cat "trendradar_latest.json")
           curl -X PATCH "https://api.github.com/gists/$GIST_ID" \
-            -H 'Authorization: token $GIST_TOKEN' \
-            -H 'Content-Type: application/json' \
-            -d @/tmp/gist_payload.json
+            -H "Authorization: token $GIST_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"files\": {\"trendradar_latest.json\": {\"content\": \"$CONTENT\"}}}"
