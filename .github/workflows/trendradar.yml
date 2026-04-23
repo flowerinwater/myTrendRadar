@@ -82,8 +82,31 @@ jobs:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: ${{ secrets.GIST_ID }}
         run: |
-          CONTENT=$(cat "trendradar_latest.json")
-          curl -X PATCH "https://api.github.com/gists/$GIST_ID" \
-            -H "Authorization: token $GIST_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{\"files\": {\"trendradar_latest.json\": {\"content\": \"$CONTENT\"}}}"
+          python -c "
+          import json
+          import os
+          
+          with open('trendradar_latest.json', 'r') as f:
+              content = f.read()
+          
+          payload = json.dumps({
+              'files': {
+                  'trendradar_latest.json': {
+                      'content': content
+                  }
+              }
+          })
+          
+          import urllib.request
+          req = urllib.request.Request(
+              f'https://api.github.com/gists/{os.environ[\"GIST_ID\"]}',
+              data=payload.encode(),
+              headers={
+                  'Authorization': f'token {os.environ[\"GIST_TOKEN\"]}',
+                  'Content-Type': 'application/json'
+              },
+              method='PATCH'
+          )
+          with urllib.request.urlopen(req) as response:
+              print(f'Gist updated: {response.status}')
+          "
