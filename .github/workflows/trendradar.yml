@@ -23,38 +23,43 @@ jobs:
       - name: Run TrendRadar
         run: python -m trendradar
 
+      
       - name: Export latest data to JSON
         run: |
-          python3 -c "
+          python -c "
           import sqlite3
           import json
-          import os
           from pathlib import Path
 
-          # Find latest database
           db_dir = Path('output/news')
           if not db_dir.exists():
               print('No database found')
               exit(0)
-
+          
           dbs = sorted(db_dir.glob('*.db'), reverse=True)
           if not dbs:
               print('No database file found')
               exit(0)
-
+          
           db_path = dbs[0]
           print(f'Using database: {db_path}')
-
+          
           conn = sqlite3.connect(db_path)
           cursor = conn.cursor()
-
+          
+          # Get table schema first
+          cursor.execute(\"SELECT name FROM sqlite_master WHERE type='table'\")
+          tables = [row[0] for row in cursor.fetchall()]
+          print(f'Tables: {tables}')
+          
           # Get latest news data
           cursor.execute('''
               SELECT source_id, title, rank, url, mobile_url, first_time, last_time
-              FROM news
-              ORDER BY rank
+              FROM news_items 
+              ORDER BY rank 
               LIMIT 100
           ''')
+          
           results = []
           for row in cursor.fetchall():
               results.append({
@@ -66,16 +71,16 @@ jobs:
                   'first_time': row[5],
                   'last_time': row[6]
               })
-
+          
           conn.close()
-
-          # Save as JSON
+          
           output = {'data': results, 'date': str(db_path.stem)}
           with open('trendradar_latest.json', 'w', encoding='utf-8') as f:
               json.dump(output, f, ensure_ascii=False, indent=2)
-
+          
           print(f'Exported {len(results)} items to trendradar_latest.json')
           "
+
 
       - name: Upload to Gist
         env:
