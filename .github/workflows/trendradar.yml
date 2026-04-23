@@ -47,14 +47,9 @@ jobs:
           conn = sqlite3.connect(db_path)
           cursor = conn.cursor()
           
-          # Get table schema first
-          cursor.execute(\"SELECT name FROM sqlite_master WHERE type='table'\")
-          tables = [row[0] for row in cursor.fetchall()]
-          print(f'Tables: {tables}')
-          
           # Get latest news data
           cursor.execute('''
-              SELECT source_id, title, rank, url, mobile_url, first_time, last_time
+              SELECT platform_id, title, rank, url, mobile_url, first_crawl_time, last_crawl_time
               FROM news_items 
               ORDER BY rank 
               LIMIT 100
@@ -63,13 +58,13 @@ jobs:
           results = []
           for row in cursor.fetchall():
               results.append({
-                  'source_id': row[0],
+                  'platform_id': row[0],
                   'title': row[1],
                   'rank': row[2],
                   'url': row[3],
                   'mobile_url': row[4],
-                  'first_time': row[5],
-                  'last_time': row[6]
+                  'first_crawl_time': row[5],
+                  'last_crawl_time': row[6]
               })
           
           conn.close()
