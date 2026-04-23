@@ -21,11 +21,11 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run TrendRadar
-        run: python3 trendradar.py
+        run: python -m trendradar
 
       - name: Find latest JSON
         run: |
-          LATEST=$(ls -t data/*.json | head -1)
+          LATEST=$(ls -t output/*.json 2>/dev/null | head -1 || ls -t data/*.json 2>/dev/null | head -1)
           echo "latest=$LATEST" >> $GITHUB_OUTPUT
 
       - name: Upload to Gist
